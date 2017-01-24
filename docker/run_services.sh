@@ -10,8 +10,5 @@
 # express or implied. See the License for the specific language 
 # governing permissions and limitations under the License. 
 
-service sshd start &
-/usr/local/spark/sbin/start-all.sh &
-/usr/local/elasticsearch/bin/elasticsearch &
-cd /usr/local/mudrod/service &
-mvn jetty:run
+su - spark -c /usr/local/spark/sbin/start-all.sh &
+su - elastic -c /usr/local/elasticsearch/bin/elasticsearch &

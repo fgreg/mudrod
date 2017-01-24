@@ -14,68 +14,76 @@
 # stack to easily get up and running with mudrod
 # For more documentation please see https://github.com/mudrod/mudrod
 
-FROM ubuntu:16.04
+FROM centos:7
 
 MAINTAINER Mudrod Team <mudrod-all@jpl.nasa.gov>
 
-# Get the package containing apt-add-repository installed for adding repositories
-RUN apt-get update && apt-get install -y software-properties-common
-
-# Install openJDK 1.8
-RUN apt-get install -y openjdk-8-jdk 
-
-# Install various dependencies
-RUN apt-get install -y \
-  build-essential \
-  git \
-  maven \
-  openssh-client \
-  openssh-server \
-  vim \
-  wget    
-
-RUN echo "JAVA_HOME=/usr/bin" >> /etc/environment
-
-RUN echo 'PATH=$PATH:HOME/bin:$JAVA_HOME/bin' >> /etc/profile &&\
-    echo 'export JAVA_HOME' >> /etc/profile &&\
-    echo 'export PATH' >> /etc/profile
+# To enable systemd. See https://github.com/docker-library/docs/tree/master/centos
+ENV container docker
+RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == \
+systemd-tmpfiles-setup.service ] || rm -f $i; done); \
+rm -f /lib/systemd/system/multi-user.target.wants/*;\
+rm -f /etc/systemd/system/*.wants/*;\
+rm -f /lib/systemd/system/local-fs.target.wants/*; \
+rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+rm -f /lib/systemd/system/basic.target.wants/*;\
+rm -f /lib/systemd/system/anaconda.target.wants/*;
+VOLUME [ "/sys/fs/cgroup" ]
 
 USER root
-
 WORKDIR /tmp
 
-########################
-# Apache Spark 1.6.2   #
-########################
-ENV SPARK_PKG_NAME spark-1.6.2
-RUN wget http://archive.apache.org/dist/spark/$SPARK_PKG_NAME/$SPARK_PKG_NAME-bin-without-hadoop.tgz  && \
-    tar -xvzf $SPARK_PKG_NAME-bin-without-hadoop.tgz && \
-    rm -f $SPARK_PKG_NAME-bin-without-hadoop.tgz && \
-    mv $SPARK_PKG_NAME-bin-without-hadoop /usr/local/spark
+# Install wget
+RUN yum -y install wget
 
-WORKDIR /usr/local
+# Install Oracle JDK 1.8u121-b13
+RUN wget -q --no-cookies --no-check-certificate --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" "http://download.oracle.com/otn-pub/java/jdk/8u121-b13/e9e7ea248e2c4826b92b3f075a80e441/jdk-8u121-linux-x64.rpm"
+RUN yum -y install jdk-8u121-linux-x64.rpm
 
-# ENV needs to be used, as the above doesn't seem to be visible from cli
-ENV JAVA_HOME /usr
+# Install various tools
+RUN yum -y install git maven which
+
+# ########################
+# # Apache Spark 1.6.2   #
+# ########################
+ENV SPARK_PKG_NAME spark-2.1.0
 ENV SPARK_HOME /usr/local/spark
-
-# so you can call 'spark-class', 'spark-shell', 'spark-sql', 'spark-submit', etc.
 ENV PATH $PATH:$SPARK_HOME/bin
 
-#######################
-# Elasticsearch 2.3.4 #
-#######################
+RUN wget -q http://archive.apache.org/dist/spark/$SPARK_PKG_NAME/$SPARK_PKG_NAME-bin-hadoop2.7.tgz  && \
+    tar -xvzf $SPARK_PKG_NAME-bin-hadoop2.7.tgz && \
+    rm -f $SPARK_PKG_NAME-bin-hadoop2.7.tgz && \
+    mv $SPARK_PKG_NAME-bin-hadoop2.7 $SPARK_HOME
+
+# Create spark user
+RUN useradd -ms /bin/bash spark
+RUN chown -R spark:spark $SPARK_HOME
+
+# #######################
+# # Elasticsearch 2.3.4 #
+# #######################
+
+# Download Elastic
 ENV ES_PKG_NAME elasticsearch-2.3.4
-RUN wget https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/2.3.4/$ES_PKG_NAME.tar.gz && \
+ENV ES_HOME /usr/local/elasticsearch
+RUN wget -q https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/2.3.4/$ES_PKG_NAME.tar.gz && \
   tar -xvzf $ES_PKG_NAME.tar.gz && \
   rm -f $ES_PKG_NAME.tar.gz && \
-  mv $ES_PKG_NAME /usr/local/elasticsearch
+  mv $ES_PKG_NAME $ES_HOME
+
+# Create elastic user
+RUN groupadd elasticsearch
+RUN useradd -s /bin/nologin elasticsearch -g elasticsearch
+RUN chown -R elasticsearch:elasticsearch $ES_HOME
 
 # Define mountable directories.
+RUN mkdir -p /data
+RUN chown -R elasticsearch:elasticsearch /data
 VOLUME ["/data"]
 
 # Mount elasticsearch.yml config
-ADD config/elasticsearch.yml /usr/local/elasticsearch/config/elasticsearch.yml
+ADD config/elasticsearch.yml $ES_HOME/config/elasticsearch.yml
 
 # Expose ports.
 # - 9200: HTTP
@@ -83,23 +91,75 @@ ADD config/elasticsearch.yml /usr/local/elasticsearch/config/elasticsearch.yml
 EXPOSE 9200
 EXPOSE 9300
 
-#########################
-# Mudrod Master Branch  #
-#########################
-WORKDIR /usr/local
-RUN git clone https://github.com/mudrod/mudrod.git
-ENV MUDROD_HOME /usr/local/mudrod 
-WORKDIR $MUDROD_HOME
-# So you can call 'mudrod'
-ENV PATH $PATH:$MUDROD_HOME/bin
-RUN mvn clean install
+# Enable elasticsearch service
+ADD elasticsearch.service /etc/systemd/system/elasticsearch.service
+RUN systemctl enable elasticsearch.service
 
-# Expose ports.
-# - 8080: HTTP Jetty Port
+# #########################
+# # Apache Tomcat 8.5.x   #
+# #########################
+USER root
+ENV TOMCAT_HOME /opt/tomcat
+# Create tomcat user and group
+RUN groupadd tomcat && \
+    mkdir $TOMCAT_HOME && \
+    useradd -s /bin/nologin -g tomcat -d $TOMCAT_HOME tomcat
+
+# Download tomcat
+WORKDIR /tmp
+RUN wget -q http://apache.spinellicreations.com/tomcat/tomcat-8/v8.5.11/bin/apache-tomcat-8.5.11.tar.gz && \
+  tar -xvzf apache-tomcat-8.5.11.tar.gz -C $TOMCAT_HOME --strip-components=1 && \
+  rm -f apache-tomcat-8.5.11.tar.gz
+
+# Set file permissions
+WORKDIR $TOMCAT_HOME
+RUN chgrp -R tomcat conf bin lib
+RUN chmod g+rwx conf
+RUN chmod g+r conf/*
+RUN chown -R tomcat logs/ temp/ webapps/ work/
+
+# Enable tomcat service
+ADD tomcat.service /etc/systemd/system/tomcat.service
+RUN systemctl enable tomcat.service
+
 EXPOSE 8080
 
-# Ensure that all of the services are running
-CMD sh $MUDROD_HOME/docker/run_services.sh
+# #########################
+# # Mudrod Master Branch  #
+# #########################
 
-# Set entry point to the Mudrod executable
-ENTRYPOINT ["/usr/local/mudrod/bin/mudrod"]
+# Create mudrod user
+RUN useradd -ms /bin/bash mudrod
+ENV MUDROD_HOME /usr/local/mudrod
+RUN mkdir -p $MUDROD_HOME
+RUN chown -R mudrod:mudrod $MUDROD_HOME
+# So you can call 'mudrod'
+ENV PATH $PATH:$MUDROD_HOME/bin
+
+USER mudrod
+
+# Clone master repo
+RUN git clone https://github.com/mudrod/mudrod.git $MUDROD_HOME
+
+# Build app
+WORKDIR $MUDROD_HOME
+RUN mvn clean package
+
+# Deploy app to tomcat
+USER tomcat
+RUN cp $MUDROD_HOME/service/target/mudrod-service-*.war $TOMCAT_HOME/webapps
+
+#
+# # Ensure that all of the services are running
+# #CMD sh $MUDROD_HOME/docker/run_services.sh
+#
+# # Set entry point to the Mudrod executable
+# # ENTRYPOINT $MUDROD_HOME/docker/run_services.sh && bash
+# ADD run_services.sh $MUDROD_HOME/docker/run_services.sh
+# ENTRYPOINT $MUDROD_HOME/docker/run_services.sh && bash
+
+USER root
+WORKDIR /usr/local
+ADD run_services.sh $MUDROD_HOME/docker/run_services.sh
+# ENTRYPOINT $MUDROD_HOME/docker/run_services.sh
+# USER mudrod
