@@ -34,15 +34,25 @@ VOLUME [ "/sys/fs/cgroup" ]
 USER root
 WORKDIR /tmp
 
-# Install wget
-RUN yum -y install wget
+# Install various tools
+RUN yum -y install wget git which
 
 # Install Oracle JDK 1.8u121-b13
 RUN wget -q --no-cookies --no-check-certificate --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" "http://download.oracle.com/otn-pub/java/jdk/8u121-b13/e9e7ea248e2c4826b92b3f075a80e441/jdk-8u121-linux-x64.rpm"
 RUN yum -y install jdk-8u121-linux-x64.rpm
+ENV JAVA_HOME /usr/java/default
 
-# Install various tools
-RUN yum -y install git maven which
+# ########################
+# # Apache Maven   #
+# ########################
+ENV M2_HOME /usr/local/apache-maven
+ENV M2 $M2_HOME/bin 
+ENV PATH $PATH:$M2
+
+RUN mkdir $M2_HOME
+RUN wget -q http://mirror.olnevhost.net/pub/apache/maven/maven-3/3.0.5/binaries/apache-maven-3.0.5-bin.tar.gz && \
+    tar -xvzf apache-maven-3.0.5-bin.tar.gz -C $M2_HOME --strip-components=1 && \
+    rm -f apache-maven-3.0.5-bin.tar.gz
 
 # ########################
 # # Apache Spark 1.6.2   #
@@ -80,7 +90,7 @@ RUN chown -R elasticsearch:elasticsearch $ES_HOME
 # Define mountable directories.
 RUN mkdir -p /data
 RUN chown -R elasticsearch:elasticsearch /data
-VOLUME ["/data"]
+# VOLUME ["/data"]
 
 # Mount elasticsearch.yml config
 ADD config/elasticsearch.yml $ES_HOME/config/elasticsearch.yml
@@ -129,17 +139,22 @@ EXPOSE 8080
 # #########################
 
 # Create mudrod user
-RUN useradd -ms /bin/bash mudrod
+# RUN useradd -ms /bin/bash mudrod
 ENV MUDROD_HOME /usr/local/mudrod
 RUN mkdir -p $MUDROD_HOME
-RUN chown -R mudrod:mudrod $MUDROD_HOME
+# RUN chown -R mudrod:mudrod $MUDROD_HOME
 # So you can call 'mudrod'
 ENV PATH $PATH:$MUDROD_HOME/bin
 
-USER mudrod
+# USER mudrod
 
 # Clone master repo
 RUN git clone https://github.com/mudrod/mudrod.git $MUDROD_HOME
+
+# Update configs
+RUN sed -i '/.*svmSgdModel.*/c <para name="svmSgdModel">file:\/\/\/usr\/local\/mudrod\/core\/src\/main\/resources\/javaSVMWithSGDModel<\/para>' $MUDROD_HOME/core/src/main/resources/config.xml
+RUN sed -i '/.*mudrod\.log\.dir.*/c mudrod\.log\.dir=$TOMCAT_HOME/logs' $MUDROD_HOME/core/src/main/resources/log4j.properties
+RUN sed -i '/.*mudrod\.log\.dir.*/c mudrod\.log\.dir=$TOMCAT_HOME/logs' $MUDROD_HOME/service/src/main/resources/log4j.properties
 
 # Build app
 WORKDIR $MUDROD_HOME
@@ -147,7 +162,7 @@ RUN mvn clean package
 
 # Deploy app to tomcat
 USER tomcat
-RUN cp $MUDROD_HOME/service/target/mudrod-service-*.war $TOMCAT_HOME/webapps
+RUN cp $MUDROD_HOME/service/target/mudrod-service-0.0.1-SNAPSHOT.war $TOMCAT_HOME/webapps
 
 #
 # # Ensure that all of the services are running
@@ -161,5 +176,6 @@ RUN cp $MUDROD_HOME/service/target/mudrod-service-*.war $TOMCAT_HOME/webapps
 USER root
 WORKDIR /usr/local
 ADD run_services.sh $MUDROD_HOME/docker/run_services.sh
-# ENTRYPOINT $MUDROD_HOME/docker/run_services.sh
+ADD entrypoint.sh /usr/local/entrypoint.sh
+# ENTRYPOINT /usr/local/entrypoint.sh
 # USER mudrod

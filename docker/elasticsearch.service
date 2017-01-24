@@ -6,11 +6,9 @@ After=network-online.target
 
 [Service]
 Environment=ES_HOME=/usr/local/elasticsearch
-Environment=CONF_DIR=${path.conf}
+Environment=CONF_DIR=/usr/local/elasticsearch/config
 Environment=DATA_DIR=/data
-Environment=LOG_DIR=/var/log/elasticsearch
-Environment=PID_DIR=/var/run/elasticsearch
-EnvironmentFile=-${path.env}
+Environment=PID_DIR=/usr/local/elasticsearch
 
 WorkingDirectory=/usr/local/elasticsearch
 
@@ -18,11 +16,10 @@ User=elasticsearch
 Group=elasticsearch
 
 ExecStart=/usr/local/elasticsearch/bin/elasticsearch \
-                                                -p ${PID_DIR}/elasticsearch.pid \
-                                                --quiet \
-                                                -Edefault.path.logs=${LOG_DIR} \
-                                                -Edefault.path.data=${DATA_DIR} \
-                                                -Edefault.path.conf=${CONF_DIR}
+                                                -Des.pidfile=${PID_DIR}/elasticsearch.pid \
+                                                -Des.default.path.home=${ES_HOME} \
+                                                -Des.default.path.data=${DATA_DIR} \
+                                                -Des.default.path.conf=${CONF_DIR}
 
 # StandardOutput is configured to redirect to journalctl since
 # some error messages may be logged in standard output before
