@@ -176,6 +176,6 @@ RUN cp $MUDROD_HOME/service/target/mudrod-service-0.0.1-SNAPSHOT.war $TOMCAT_HOM
 USER root
 WORKDIR /usr/local
 ADD run_services.sh $MUDROD_HOME/docker/run_services.sh
-ADD entrypoint.sh /usr/local/entrypoint.sh
+# ADD entrypoint.sh /usr/local/entrypoint.sh
 # ENTRYPOINT /usr/local/entrypoint.sh
 # USER mudrod
