@@ -21,15 +21,15 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
+import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.jena.ontology.Individual;
 import org.apache.jena.ontology.OntClass;
@@ -53,8 +53,6 @@ import esiptestbed.mudrod.ontology.OntologyFactory;
  * whcih are cached locally and available on the runtime classpath e.g.
  * in <code>src/main/resource/ontology/...</code>.
  * From here we can test and iterate on how use of ontology can enhance search.
- * 
- * @author lewismc
  */
 public class LocalOntology implements Ontology {
 
@@ -66,7 +64,7 @@ public class LocalOntology implements Ontology {
   private static Hashtable searchTerms = new Hashtable<>();
   private static OntologyParser parser;
   private static OntModel ontologyModel;
-  private static Ontology ontology = null;
+  private static Ontology ontology;
   private static Map mAnonIDs = new HashMap<>();
   private static int mAnonCount = 0;
 
@@ -74,18 +72,21 @@ public class LocalOntology implements Ontology {
     //only initialize all the static variables
     //if first time called to this ontology constructor
     if (ontology == null) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Creating new ontology");
+      if (LOG.isInfoEnabled()) {
+        LOG.info("Creating new ontology");
       }
       parser = new OwlParser();
       ontology = this;
     }
-
     if (ontologyModel == null)
-      ontologyModel =
-      ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM, null);
+      ontologyModel = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM, null);
   }
 
+  /**
+   * Static accessor for {@link esiptestbed.mudrod.ontology.process.LocalOntology}
+   * instance implementation defined within <code>config.xml</code>.
+   * @return a {@link esiptestbed.mudrod.ontology.process.LocalOntology}
+   */
   public static Ontology getInstance () {
     if (ontology == null) {
       ontology = new LocalOntology();
@@ -94,7 +95,28 @@ public class LocalOntology implements Ontology {
   }
 
   /**
-   * 
+   * Load the default <i>ontology</i> directory contained within Mudrod.
+   * This contains at a minimum SWEET v2.3.
+   */
+  @Override
+  public void load() {
+    File ontDir = new File(LocalOntology.class.getClassLoader().getResource("ontology").getFile());
+
+    //Fail if the input is not a directory.
+    if (ontDir.isDirectory()) {
+      List<String> owlFiles = new ArrayList<>();
+      for (File owlFile : ontDir.listFiles()) {
+        owlFiles.add(owlFile.toString());
+      }
+      //convert to correct iput for ontology loading.
+      String[] owlArray = new String[owlFiles.size()];
+      owlArray = owlFiles.toArray(owlArray);
+      load(owlArray);
+    }
+  }
+
+  /**
+   * Load a string array of local URIs which refernece .owl files.
    */
   @Override
   public void load (String[] urls) {
@@ -108,10 +130,10 @@ public class LocalOntology implements Ontology {
 
   private void load (Object m, String url) {
     try {
-      if (LOG.isDebugEnabled()) { 
-        LOG.debug("Reading {}", url); 
+      if (LOG.isInfoEnabled()) { 
+        LOG.info("Reading {}", url); 
       }
-      ((OntModel)m).read(url);
+      ((OntModel)m).read(url, null, null);
     } catch (Exception e) {
       LOG.error("Failed whilst attempting to read ontology {}", url, e);
     }
@@ -336,9 +358,8 @@ public class LocalOntology implements Ontology {
     // boolean options
     Option helpOpt = new Option("h", "help", false, "show this help message");
     // argument options
-    Option ontDirOpt = Option.builder(ONT_DIR).required(true).numberOfArgs(1)
-        .hasArg(true).desc("A directory containing .owl files.")
-        .argName(ONT_DIR).build();
+    Option ontDirOpt = OptionBuilder.hasArg(true).withArgName(ONT_DIR)
+        .withDescription("A directory containing .owl files.").isRequired(false).create();
 
     // create the options
     Options options = new Options();
@@ -346,7 +367,7 @@ public class LocalOntology implements Ontology {
     options.addOption(ontDirOpt);
 
     String ontDir;
-    CommandLineParser parser = new DefaultParser();
+    CommandLineParser parser = new GnuParser();
     try {
       CommandLine line = parser.parse(options, args);
 

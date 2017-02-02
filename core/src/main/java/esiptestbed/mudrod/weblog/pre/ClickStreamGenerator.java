@@ -18,6 +18,9 @@ import java.util.Properties;
 
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import esiptestbed.mudrod.discoveryengine.DiscoveryStepAbstract;
 import esiptestbed.mudrod.driver.ESDriver;
 import esiptestbed.mudrod.driver.SparkDriver;
@@ -25,9 +28,6 @@ import esiptestbed.mudrod.utils.LabeledRowMatrix;
 import esiptestbed.mudrod.utils.MatrixUtil;
 import esiptestbed.mudrod.weblog.structure.ClickStream;
 import esiptestbed.mudrod.weblog.structure.SessionExtractor;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Supports ability to extract click stream data based on session processing results
@@ -47,7 +47,7 @@ public class ClickStreamGenerator extends DiscoveryStepAbstract {
 
   @Override
   public Object execute() {
-    LOG.info("Starting click stream generator.");
+    LOG.info("Starting ClickStreamGenerator...");
     startTime = System.currentTimeMillis();
 
     String clickstremMatrixFile = props.getProperty("clickstreamMatrix");
@@ -61,14 +61,14 @@ public class ClickStreamGenerator extends DiscoveryStepAbstract {
       LabeledRowMatrix wordDocMatrix = MatrixUtil
           .createWordDocMatrix(metaddataQueryRDD, spark.sc);
 
-      MatrixUtil.exportToCSV(wordDocMatrix.wordDocMatrix, wordDocMatrix.words, wordDocMatrix.docs,
-          clickstremMatrixFile);
+      MatrixUtil.exportToCSV(wordDocMatrix.rowMatrix, wordDocMatrix.rowkeys,
+          wordDocMatrix.colkeys, clickstremMatrixFile);
     } catch (Exception e) {
       e.printStackTrace();
     }
 
     endTime = System.currentTimeMillis();
-    LOG.info("Click stream generation complete. Time elapsed {} seconds.",
+    LOG.info("ClickStreamGenerator complete. Time elapsed {} seconds.",
         (endTime - startTime) / 1000);
     return null;
   }

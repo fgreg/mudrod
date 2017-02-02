@@ -17,10 +17,10 @@ is a semantic discovery and search project funded by NASA AIST (NNX15AM85G).
  * Java 8
  * Git
  * Apache Maven 3.X
- * Elasticsearch v2.6.X
+ * Elasticsearch v5.X
  * Kibana v4
  * Apache Spark v2.0.0
- * Apache Tomcat 8.X
+ * Apache Tomcat 7.X
 
 # Installation
 
@@ -37,7 +37,9 @@ $ mvn clean install
 $ cd service
 $ mvn tomcat7:run
 ```
-You will now be able to access the Mudrod Web Application at [http://localhost:8080/mudrod-service](http://localhost:8080/mudrod-service). **N.B.** The service should not be run this way in production. Please see below for running the service via Tomcat in a production setting.
+You will now be able to access the Mudrod Web Application at [http://localhost:8080/mudrod-service](http://localhost:8080/mudrod-service). **N.B.** The service should not be run this way in production.
+
+# Documentation
 
 In another window...
 ```
@@ -66,9 +68,9 @@ Once Tomcat hot deploys the .war artifact, you will be able to browse to the run
 * Jiang, Y., Y. Li, C. Yang, K. Liu, E. M. Armstrong, T. Huang & D. Moroni (2016) A Comprehensive Approach to Determining the Linkage Weights among Geospatial Vocabularies - An Example with Oceanographic Data Discovery. International Journal of Geographical Information Science (under review)
 * Jiang, Y., Y. Li, C. Yang, K. Liu, E. M. Armstrong, T. Huang, D. Moroni & L. Mcgibbney (2016) Towards intelligent geospatial discovery: a machine learning ranking framework. Remote Sensning (under review)
 
+## Mudrod Wiki
 
-
-# Documentation
+https://github.com/mudrod/mudrod/wiki
 
 ## Java API Documentation
 
@@ -98,6 +100,4 @@ The REST API documentation can also be seen at [https://mudrod.github.io/miredot
 
 #License
 This source code is licensed under the [Apache License v2.0](http://www.apache.org/licenses/LICENSE-2.0), a
-copy of which is shipped with this project.
-
- 
+copy of which is shipped with this project. 

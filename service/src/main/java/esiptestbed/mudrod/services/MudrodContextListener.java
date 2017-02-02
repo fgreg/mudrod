@@ -23,6 +23,8 @@ import javax.servlet.annotation.WebListener;
 import esiptestbed.mudrod.driver.ESDriver;
 import esiptestbed.mudrod.driver.SparkDriver;
 import esiptestbed.mudrod.main.MudrodEngine;
+import esiptestbed.mudrod.ontology.Ontology;
+import esiptestbed.mudrod.ontology.OntologyFactory;
 import esiptestbed.mudrod.ssearch.Ranker;
 import esiptestbed.mudrod.ssearch.Searcher;
 
@@ -32,12 +34,14 @@ import esiptestbed.mudrod.ssearch.Searcher;
  */
 @WebListener
 public class MudrodContextListener implements ServletContextListener {
+
   MudrodEngine me = null;
+
   /**
    * Default constructor.
    */
   public MudrodContextListener() {
-    //default constructor
+    // default constructor
   }
 
   /**
@@ -56,14 +60,16 @@ public class MudrodContextListener implements ServletContextListener {
     me = new MudrodEngine();
     Properties props = me.loadConfig();
     me.setESDriver(new ESDriver(props));
-    me.setSparkDriver(new SparkDriver());
+    me.setSparkDriver(new SparkDriver(props));
 
     ServletContext ctx = arg0.getServletContext();
-    Searcher searcher = new Searcher(me.getConfig(), me.getESDriver(), null);
-    Ranker ranker = new Ranker(me.getConfig(), me.getESDriver(), me.getSparkDriver(), "SparkSVM");
+    Searcher searcher = new Searcher(props, me.getESDriver(), null);
+    Ranker ranker = new Ranker(props, me.getESDriver(), me.getSparkDriver(), "SparkSVM");
+    Ontology ontImpl = new OntologyFactory(props).getOntology();
     ctx.setAttribute("MudrodInstance", me);
     ctx.setAttribute("MudrodSearcher", searcher);
     ctx.setAttribute("MudrodRanker", ranker);
+    ctx.setAttribute("Ontology", ontImpl);
   }
 
 }
